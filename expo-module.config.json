@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ReactNativeFoundationModelsModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.foundationmodels.ReactNativeFoundationModelsModule"]
+  }
+}
