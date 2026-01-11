@@ -1,7 +1,10 @@
-export { isAvailable, generateResponse } from './ReactNativeFoundationModelsModule';
+export {
+  isAvailable,
+  generateResponse,
+} from "./ReactNativeFoundationModelsModule";
 export type {
   SessionConfig,
   GenerateOptions,
   GenerateResponse,
   FoundationModelsErrorCode,
-} from './ReactNativeFoundationModels.types';
+} from "./ReactNativeFoundationModels.types";

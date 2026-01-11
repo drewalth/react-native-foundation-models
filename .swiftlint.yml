@@ -7,22 +7,7 @@ line_length:
   error: 250
 
 included:
-  - GaugeWatcher
-  - GaugeWatcherTests
-  - GaugeWatcherUITests
-  - GaugeDrivers/Sources
-  - GaugeDrivers/Tests
-  - GaugeSources/Sources
-  - GaugeSources/Tests
-  - UIAppearance/Sources
-  - UIAppearance/Tests
-  - AppTelemetry/Sources
-  - AppTelemetry/Tests
-  - GaugeWatcherMac
-  - SharedFeatures/Sources
-  - SharedFeatures/Tests
-  - GaugeBot/Sources
-  - GaugeBot/Tests
+  - ios/
 
 excluded:
   - .build
@@ -36,7 +21,7 @@ excluded:
   - .swiftpackage.resolved
 
 disabled_rules:
-  - trailing_whitespace  # Handled by IDE formatting
+  - trailing_whitespace # Handled by IDE formatting
 
 # Enables documentation, concurrency, and modern patterns
 documentation: warning

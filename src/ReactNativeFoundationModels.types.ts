@@ -42,10 +42,10 @@ export enum FoundationModelsErrorCode {
    * FoundationModels is not available on this device.
    * Requires iOS 26.0+ with Apple Silicon.
    */
-  UNAVAILABLE = 'UNAVAILABLE',
+  UNAVAILABLE = "UNAVAILABLE",
 
   /**
    * The generation request failed.
    */
-  GENERATION_FAILED = 'GENERATION_FAILED',
+  GENERATION_FAILED = "GENERATION_FAILED",
 }

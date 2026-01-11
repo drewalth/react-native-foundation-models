@@ -1,13 +1,18 @@
-import { requireNativeModule } from 'expo-modules-core';
+import { requireNativeModule } from "expo-modules-core";
 
-import type { GenerateOptions, GenerateResponse } from './ReactNativeFoundationModels.types';
+import type {
+  GenerateOptions,
+  GenerateResponse,
+} from "./ReactNativeFoundationModels.types";
 
 interface NativeModule {
   isAvailable(): boolean;
   generateResponse(options: GenerateOptions): Promise<GenerateResponse>;
 }
 
-const NativeFoundationModels = requireNativeModule<NativeModule>('ReactNativeFoundationModels');
+const NativeFoundationModels = requireNativeModule<NativeModule>(
+  "ReactNativeFoundationModels"
+);
 
 /**
  * Check if FoundationModels is available on this device.
@@ -37,6 +42,8 @@ export function isAvailable(): boolean {
  * console.log(response.content);
  * ```
  */
-export function generateResponse(options: GenerateOptions): Promise<GenerateResponse> {
+export function generateResponse(
+  options: GenerateOptions
+): Promise<GenerateResponse> {
   return NativeFoundationModels.generateResponse(options);
 }
