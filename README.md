@@ -30,14 +30,14 @@ npm link react-native-foundation-models
 ## Usage
 
 ```typescript
-import { isAvailable, generateResponse } from 'react-native-foundation-models';
+import { isAvailable, generateResponse } from "react-native-foundation-models";
 
 // Check availability
 if (isAvailable()) {
   const response = await generateResponse({
-    prompt: 'Explain quantum computing in one sentence.',
+    prompt: "Explain quantum computing in one sentence.",
     config: {
-      instructions: 'You are a concise science educator.',
+      instructions: "You are a concise science educator.",
     },
   });
 
@@ -55,9 +55,9 @@ Returns `true` if FoundationModels is available on the current device.
 
 Generates a response using the on-device language model.
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `prompt` | `string` | The user prompt |
+| Option                | Type      | Description                                 |
+| --------------------- | --------- | ------------------------------------------- |
+| `prompt`              | `string`  | The user prompt                             |
 | `config.instructions` | `string?` | System instructions to guide model behavior |
 
 ## Roadmap
@@ -65,6 +65,14 @@ Generates a response using the on-device language model.
 - [ ] Stateful sessions (multi-turn conversations)
 - [ ] Streaming responses
 - [ ] Tool calling
+
+## Contributing
+
+Contributions are welcome! This is a new framework and there's a lot to explore.
+
+- Check the [roadmap](#roadmap) for planned features
+- Open an [issue](https://github.com/drewalth/react-native-foundation-models/issues) to discuss ideas or report bugs
+- PRs for bug fixes, documentation, and new features are appreciated
 
 ## License
 
