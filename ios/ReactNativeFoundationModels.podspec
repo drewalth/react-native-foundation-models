@@ -11,8 +11,7 @@ Pod::Spec.new do |s|
   s.author         = package['author']
   s.homepage       = package['homepage']
   s.platforms      = {
-    :ios => '15.1',
-    :tvos => '15.1'
+    :ios => '26.0'
   }
   s.swift_version  = '5.9'
   s.source         = { git: 'https://github.com/drewalth/react-native-foundation-models' }
@@ -25,5 +24,5 @@ Pod::Spec.new do |s|
     'DEFINES_MODULE' => 'YES',
   }
 
-  s.source_files = "**/*.{h,m,mm,swift,hpp,cpp}"
+  s.source_files = "**/*.swift"
 end

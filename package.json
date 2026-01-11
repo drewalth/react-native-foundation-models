@@ -1,7 +1,7 @@
 {
   "name": "react-native-foundation-models",
   "version": "0.1.0",
-  "description": "My new module",
+  "description": "React Native module for FoundationModels",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {

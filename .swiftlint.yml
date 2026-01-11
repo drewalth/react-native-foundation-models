@@ -1,0 +1,45 @@
+type_name:
+  allowed_symbols: "_"
+identifier_name:
+  min_length: 2
+line_length:
+  warning: 220
+  error: 250
+
+included:
+  - GaugeWatcher
+  - GaugeWatcherTests
+  - GaugeWatcherUITests
+  - GaugeDrivers/Sources
+  - GaugeDrivers/Tests
+  - GaugeSources/Sources
+  - GaugeSources/Tests
+  - UIAppearance/Sources
+  - UIAppearance/Tests
+  - AppTelemetry/Sources
+  - AppTelemetry/Tests
+  - GaugeWatcherMac
+  - SharedFeatures/Sources
+  - SharedFeatures/Tests
+  - GaugeBot/Sources
+  - GaugeBot/Tests
+
+excluded:
+  - .build
+  - .swiftpm
+  - .git
+  - .github
+  - .vscode
+  - .swiftformat
+  - .swiftlint.yml
+  - .swiftpackage
+  - .swiftpackage.resolved
+
+disabled_rules:
+  - trailing_whitespace  # Handled by IDE formatting
+
+# Enables documentation, concurrency, and modern patterns
+documentation: warning
+strict_concurrency: warning
+sendable: warning
+implicitly_unwrapped_optional: error

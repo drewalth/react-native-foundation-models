@@ -1,9 +1,6 @@
 {
-  "platforms": ["apple", "android", "web"],
-  "apple": {
+  "platforms": ["ios"],
+  "ios": {
     "modules": ["ReactNativeFoundationModelsModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.foundationmodels.ReactNativeFoundationModelsModule"]
   }
 }
