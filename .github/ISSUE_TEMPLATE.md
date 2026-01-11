@@ -4,9 +4,9 @@
 
 ## Steps to Reproduce
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## Expected Behavior
 
@@ -19,5 +19,5 @@
 ## Environment
 
 - OS: [e.g. iOS 26.0]
-- Package Version: 
+- Package Version:
 - Device: [e.g. iPhone 15 Pro]
