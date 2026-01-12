@@ -296,7 +296,7 @@ interface GenerateResponse {
 
 - [x] Stateful sessions (multi-turn conversations)
 - [x] Tool calling
-- [ ] Streaming responses
+- [x] Streaming responses
 - [ ] Guided generation (response schemas)
 
 ## Contributing
