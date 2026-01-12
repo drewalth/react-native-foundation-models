@@ -2,7 +2,7 @@
 
 React Native bindings for Apple's on-device [FoundationModels](https://developer.apple.com/documentation/FoundationModels) framework.
 
-> **⚠️ Work in Progress**  
+> **⚠️ Experimental**  
 > This library is under active development. The API may change.
 
 ## Requirements

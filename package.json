@@ -1,5 +1,5 @@
 {
-  "name": "react-native-foundation-models",
+  "name": "@drewalth/react-native-foundation-models",
   "version": "0.1.0",
   "description": "React Native module for FoundationModels",
   "main": "build/index.js",
@@ -8,7 +8,12 @@
     "build": "expo-module build && npm run build:plugin",
     "build:plugin": "tsc --project plugin/tsconfig.json",
     "clean": "expo-module clean && rm -rf plugin/build",
-    "lint": "expo-module lint",
+    "lint:js": "eslint .",
+    "lint:swift": "swiftlint . --config .swiftlint.yml",
+    "lint": "npm-run-all lint:*",
+    "format:js": "prettier --write .",
+    "format:swift": "swiftformat . --config airbnb.swiftformat && swiftlint . --config .swiftlint.yml --fix --format",
+    "format": "npm-run-all format:*",
     "test": "expo-module test",
     "prepare": "husky",
     "prepublishOnly": "expo-module prepublishOnly && npm run build:plugin",
@@ -21,7 +26,10 @@
     "react-native-foundation-models",
     "ReactNativeFoundationModels"
   ],
-  "repository": "https://github.com/drewalth/react-native-foundation-models",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drewalth/react-native-foundation-models.git"
+  },
   "bugs": {
     "url": "https://github.com/drewalth/react-native-foundation-models/issues"
   },
@@ -37,6 +45,7 @@
     "expo": "^54.0.27",
     "expo-module-scripts": "^5.0.8",
     "husky": "9.1.7",
+    "npm-run-all": "4.1.5",
     "prettier": "3.7.4",
     "react-native": "0.81.5"
   },
