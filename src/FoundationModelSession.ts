@@ -4,6 +4,8 @@ import type {
   SessionConfig,
   GenerateResponse,
   Message,
+  StreamChunk,
+  StreamResult,
 } from "./ReactNativeFoundationModels.types";
 import type { ToolHandlers } from "./generated/tools";
 
@@ -27,11 +29,38 @@ interface ToolCallEvent {
 }
 
 /**
+ * Event payload for stream updates.
+ */
+interface StreamUpdateEvent {
+  streamId: string;
+  delta: string;
+  accumulated: string;
+}
+
+/**
+ * Event payload for stream completion.
+ */
+interface StreamCompleteEvent {
+  streamId: string;
+  content: string;
+}
+
+/**
+ * Event payload for stream errors.
+ */
+interface StreamErrorEvent {
+  streamId: string;
+  error: string;
+}
+
+/**
  * Native module interface for session management.
  */
 interface NativeSessionModule {
   createSession(config: SessionConfig | null): void;
   sendMessage(prompt: string): Promise<GenerateResponse>;
+  startStream(prompt: string): Promise<string>;
+  cancelStream(streamId: string): void;
   getHistory(): Message[];
   clearSession(): void;
   destroySession(): void;
@@ -39,6 +68,18 @@ interface NativeSessionModule {
   addListener(
     eventName: "onToolCall",
     listener: (event: ToolCallEvent) => void
+  ): EventSubscription;
+  addListener(
+    eventName: "onStreamUpdate",
+    listener: (event: StreamUpdateEvent) => void
+  ): EventSubscription;
+  addListener(
+    eventName: "onStreamComplete",
+    listener: (event: StreamCompleteEvent) => void
+  ): EventSubscription;
+  addListener(
+    eventName: "onStreamError",
+    listener: (event: StreamErrorEvent) => void
   ): EventSubscription;
 }
 
@@ -119,6 +160,128 @@ export class FoundationModelSession {
   async sendMessage(prompt: string): Promise<GenerateResponse> {
     this.ensureNotDestroyed();
     return NativeModule.sendMessage(prompt);
+  }
+
+  /**
+   * Send a message to the model and receive a streaming response.
+   *
+   * The conversation history is automatically maintained, allowing for
+   * multi-turn conversations where the model remembers previous exchanges.
+   * This method returns an AsyncGenerator that yields chunks of text as they
+   * are generated, enabling real-time display of the response.
+   *
+   * @param prompt - The message to send to the model
+   * @returns AsyncGenerator that yields StreamChunk objects and returns final StreamResult
+   * @throws Error if the session has been destroyed or generation fails
+   *
+   * @example
+   * ```typescript
+   * const stream = session.sendMessageStream("Tell me a story");
+   * for await (const chunk of stream) {
+   *   console.log(chunk.delta); // New text since last chunk
+   *   console.log(chunk.accumulated); // Full text so far
+   * }
+   * // Generator returns final result with complete content
+   * ```
+   */
+  async *sendMessageStream(
+    prompt: string
+  ): AsyncGenerator<StreamChunk, StreamResult, undefined> {
+    this.ensureNotDestroyed();
+
+    interface QueueItem {
+      type: "chunk" | "complete" | "error";
+      data?: StreamChunk | StreamResult | Error;
+    }
+
+    const queue: QueueItem[] = [];
+    let resolver: ((item: QueueItem) => void) | null = null;
+
+    const push = (item: QueueItem) => {
+      if (resolver) {
+        resolver(item);
+        resolver = null;
+      } else {
+        queue.push(item);
+      }
+    };
+
+    const pull = (): Promise<QueueItem> => {
+      if (queue.length > 0) {
+        return Promise.resolve(queue.shift()!);
+      }
+      return new Promise((resolve) => {
+        resolver = resolve;
+      });
+    };
+
+    // Start the stream
+    const streamId = await NativeModule.startStream(prompt);
+
+    // Set up event listeners
+    const updateListener = NativeModule.addListener(
+      "onStreamUpdate",
+      (event: StreamUpdateEvent) => {
+        if (event.streamId === streamId) {
+          push({
+            type: "chunk",
+            data: {
+              delta: event.delta,
+              accumulated: event.accumulated,
+            },
+          });
+        }
+      }
+    );
+
+    const completeListener = NativeModule.addListener(
+      "onStreamComplete",
+      (event: StreamCompleteEvent) => {
+        if (event.streamId === streamId) {
+          push({
+            type: "complete",
+            data: {
+              content: event.content,
+            },
+          });
+        }
+      }
+    );
+
+    const errorListener = NativeModule.addListener(
+      "onStreamError",
+      (event: StreamErrorEvent) => {
+        if (event.streamId === streamId) {
+          push({
+            type: "error",
+            data: new Error(event.error),
+          });
+        }
+      }
+    );
+
+    try {
+      // Process queue items
+      while (true) {
+        const item = await pull();
+
+        if (item.type === "chunk") {
+          yield item.data as StreamChunk;
+        } else if (item.type === "complete") {
+          return item.data as StreamResult;
+        } else if (item.type === "error") {
+          throw item.data as Error;
+        }
+      }
+    } finally {
+      // Clean up listeners
+      updateListener.remove();
+      completeListener.remove();
+      errorListener.remove();
+
+      // Cancel the stream if it's still active
+      NativeModule.cancelStream(streamId);
+    }
   }
 
   /**

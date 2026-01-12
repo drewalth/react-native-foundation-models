@@ -22,5 +22,7 @@ export type {
   GenerateResponse,
   Message,
   FoundationModelsErrorCode,
+  StreamChunk,
+  StreamResult,
 } from "./ReactNativeFoundationModels.types";
 export type { ToolHandlers, ToolName } from "./generated/tools";

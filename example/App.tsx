@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -21,6 +22,8 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streamingEnabled, setStreamingEnabled] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
 
   const available = isAvailable();
 
@@ -143,14 +146,30 @@ Base Stats: ${stats}`;
 
     setLoading(true);
     setError(null);
+    setStreamingText("");
 
     try {
-      await session.sendMessage(prompt.trim());
-      // Update messages from session history
-      setMessages(session.getHistory());
-      setPrompt("");
+      if (streamingEnabled) {
+        // Streaming mode
+        const stream = session.sendMessageStream(prompt.trim());
+        setPrompt("");
+
+        for await (const chunk of stream) {
+          setStreamingText(chunk.accumulated);
+        }
+
+        // Update messages from session history after stream completes
+        setMessages(session.getHistory());
+        setStreamingText("");
+      } else {
+        // Complete response mode
+        await session.sendMessage(prompt.trim());
+        setMessages(session.getHistory());
+        setPrompt("");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+      setStreamingText("");
     } finally {
       setLoading(false);
     }
@@ -185,7 +204,24 @@ Base Stats: ${stats}`;
           </View>
         </View>
 
-        {messages.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Settings</Text>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Streaming Mode</Text>
+              <Text style={styles.settingDescription}>
+                Display text as it's generated
+              </Text>
+            </View>
+            <Switch
+              value={streamingEnabled}
+              onValueChange={setStreamingEnabled}
+              disabled={!available || loading}
+            />
+          </View>
+        </View>
+
+        {(messages.length > 0 || streamingText) && (
           <View style={styles.card}>
             <View style={styles.historyHeader}>
               <Text style={styles.cardTitle}>Conversation</Text>
@@ -209,6 +245,15 @@ Base Stats: ${stats}`;
                 <Text style={styles.messageContent}>{message.content}</Text>
               </View>
             ))}
+            {streamingText && (
+              <View style={[styles.messageContainer, styles.assistantMessage]}>
+                <Text style={styles.messageRole}>Assistant</Text>
+                <Text style={styles.messageContent}>
+                  {streamingText}
+                  <Text style={styles.streamingCursor}>▋</Text>
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -353,5 +398,28 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 15,
     color: "#ff3b30",
+  },
+  settingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  settingLabel: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 2,
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: "#666",
+  },
+  streamingCursor: {
+    color: "#007AFF",
+    fontWeight: "600",
   },
 });

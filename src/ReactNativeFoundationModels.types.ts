@@ -36,6 +36,31 @@ export interface GenerateResponse {
 }
 
 /**
+ * A chunk of streamed content.
+ */
+export interface StreamChunk {
+  /**
+   * The new text delta since the last chunk.
+   */
+  delta: string;
+
+  /**
+   * The full accumulated text so far.
+   */
+  accumulated: string;
+}
+
+/**
+ * Final result from a completed stream.
+ */
+export interface StreamResult {
+  /**
+   * The final complete content.
+   */
+  content: string;
+}
+
+/**
  * A message in the conversation history.
  */
 export interface Message {

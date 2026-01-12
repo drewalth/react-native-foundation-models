@@ -10,8 +10,8 @@ public class ReactNativeFoundationModelsModule: Module {
     public func definition() -> ModuleDefinition {
         Name("ReactNativeFoundationModels")
 
-        // Event sent when a tool needs to be executed
-        Events("onToolCall")
+        // Events
+        Events("onToolCall", "onStreamUpdate", "onStreamComplete", "onStreamError")
 
         // Check if FoundationModels is available on this device
         Function("isAvailable") { () -> Bool in
@@ -115,6 +115,72 @@ public class ReactNativeFoundationModelsModule: Module {
             self.currentSessionConfig = nil
         }
 
+        // Start streaming response
+        AsyncFunction("startStream") { (prompt: String) -> String in
+            guard #available(iOS 26.0, *) else {
+                throw FoundationModelsError.unavailable
+            }
+
+            guard let session = self.currentSession else {
+                throw FoundationModelsError.noActiveSession
+            }
+
+            // Generate unique stream ID
+            let streamId = UUID().uuidString
+
+            // Start async task that iterates over stream responses
+            let task = Task {
+                do {
+                    var lastContent = ""
+                    for try await partial in session.streamResponse(to: prompt) {
+                        let currentContent = partial.content
+                        let delta = String(currentContent.dropFirst(lastContent.count))
+                        lastContent = currentContent
+
+                        self.sendEvent("onStreamUpdate", [
+                            "streamId": streamId,
+                            "delta": delta,
+                            "accumulated": currentContent
+                        ])
+                    }
+                    self.sendEvent("onStreamComplete", [
+                        "streamId": streamId,
+                        "content": lastContent
+                    ])
+                } catch let error as NSError {
+                    if self.containsModelManagerError(error, code: 1026) {
+                        self.sendEvent("onStreamError", [
+                            "streamId": streamId,
+                            "error": "Apple Intelligence is not enabled or there is a version mismatch. Ensure Apple Intelligence is enabled in Settings > Apple Intelligence & Siri, and that your iOS simulator version matches your macOS version."
+                        ])
+                    } else {
+                        self.sendEvent("onStreamError", [
+                            "streamId": streamId,
+                            "error": error.localizedDescription
+                        ])
+                    }
+                } catch {
+                    self.sendEvent("onStreamError", [
+                        "streamId": streamId,
+                        "error": error.localizedDescription
+                    ])
+                }
+                self.activeStreams.removeValue(forKey: streamId)
+            }
+
+            self.activeStreams[streamId] = task
+            return streamId
+        }
+
+        // Cancel active stream
+        Function("cancelStream") { (streamId: String) in
+            guard let task = self.activeStreams[streamId] else {
+                return
+            }
+            task.cancel()
+            self.activeStreams.removeValue(forKey: streamId)
+        }
+
         // Legacy: Generate a response (creates ephemeral session)
         // Kept for backwards compatibility
         AsyncFunction("generateResponse") { (options: GenerateOptions) -> GenerateResponse in
@@ -165,6 +231,7 @@ public class ReactNativeFoundationModelsModule: Module {
     private var toolBridge: ToolBridge?
     private var _currentSession: Any?
     private var currentSessionConfig: SessionConfig?
+    private var activeStreams: [String: Task<Void, Never>] = [:]
 
     @available(iOS 26.0, *)
     private var currentSession: LanguageModelSession? {
