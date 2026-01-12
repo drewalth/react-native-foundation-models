@@ -10,12 +10,21 @@ public class ReactNativeFoundationModelsModule: Module {
     public func definition() -> ModuleDefinition {
         Name("ReactNativeFoundationModels")
 
+        // Define events that can be sent to JavaScript
+        Events("onToolCall")
+
         // Check if FoundationModels is available on this device
         Function("isAvailable") { () -> Bool in
             if #available(iOS 26.0, *) {
                 return SystemLanguageModel.default.isAvailable
             }
             return false
+        }
+
+        // Respond to a tool call from JavaScript
+        Function("respondToToolCall") { (requestId: String, result: String?, error: String?) in
+            guard #available(iOS 26.0, *) else { return }
+            self.toolBridge?.handleToolResponse(requestId: requestId, result: result, error: error)
         }
 
         // Generate a response using FoundationModels
@@ -30,15 +39,36 @@ public class ReactNativeFoundationModelsModule: Module {
                 throw FoundationModelsError.unavailable
             }
 
-            let session: LanguageModelSession
-
-            if let instructions = options.config?.instructions {
-                session = LanguageModelSession(model: model, instructions: instructions)
-            } else {
-                session = LanguageModelSession(model: model)
+            // Create tool bridge if not exists
+            if self.toolBridge == nil {
+                self.toolBridge = ToolBridge()
+                self.toolBridge?.sendToolCallEvent = { [weak self] requestId, toolName, arguments in
+                    self?.sendEvent("onToolCall", [
+                        "requestId": requestId,
+                        "toolName": toolName,
+                        "arguments": arguments
+                    ])
+                }
             }
 
             do {
+                let session: LanguageModelSession
+
+                if hasGeneratedTools() {
+                    // Use session with generated tools
+                    session = createSessionWithTools(
+                        model: model,
+                        instructions: options.config?.instructions,
+                        bridge: self.toolBridge!)
+                } else {
+                    // No tools - use simple session
+                    if let instructions = options.config?.instructions {
+                        session = LanguageModelSession(model: model, instructions: instructions)
+                    } else {
+                        session = LanguageModelSession(model: model)
+                    }
+                }
+
                 let response = try await session.respond(to: options.prompt)
                 return GenerateResponse(content: response.content)
             } catch let error as NSError {
@@ -55,6 +85,9 @@ public class ReactNativeFoundationModelsModule: Module {
     }
 
     // MARK: Private
+
+    /// Tool bridge for communicating with JavaScript handlers.
+    private var toolBridge: ToolBridge?
 
     /// Recursively checks if an NSError or its underlying errors contain a ModelManagerError with the specified code
     private func containsModelManagerError(_ error: NSError, code: Int) -> Bool {

@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { isAvailable, generateResponse } from "react-native-foundation-models";
+import { useState, useEffect } from "react";
+import {
+  isAvailable,
+  generateResponse,
+  registerToolHandlers,
+} from "react-native-foundation-models";
 import {
   ActivityIndicator,
   Button,
@@ -19,6 +23,106 @@ export default function App() {
 
   const available = isAvailable();
 
+  // Register tool handlers on mount
+  useEffect(() => {
+    registerToolHandlers({
+      getCurrentTime: ({ timezone, format }) => {
+        const now = new Date();
+
+        try {
+          if (format === "short") {
+            return now.toLocaleTimeString("en-US", {
+              timeZone: timezone || undefined,
+            });
+          }
+
+          return now.toLocaleString("en-US", {
+            timeZone: timezone || undefined,
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "numeric",
+            minute: "numeric",
+            second: "numeric",
+          });
+        } catch {
+          // Invalid timezone, fall back to local
+          return format === "short"
+            ? now.toLocaleTimeString()
+            : now.toLocaleString();
+        }
+      },
+
+      calculate: ({ expression }) => {
+        try {
+          // Simple safe math evaluation
+          // Only allow numbers, operators, parentheses, and whitespace
+          const sanitized = expression.replace(/[^0-9+\-*/().%\s]/g, "");
+          if (sanitized !== expression) {
+            return "Error: Invalid characters in expression";
+          }
+
+          // Use Function constructor for safe evaluation
+          // eslint-disable-next-line no-new-func
+          const result = new Function(`return (${sanitized})`)();
+
+          if (typeof result !== "number" || !isFinite(result)) {
+            return "Error: Invalid calculation result";
+          }
+
+          return String(result);
+        } catch (err) {
+          return `Error: ${
+            err instanceof Error ? err.message : "Calculation failed"
+          }`;
+        }
+      },
+
+      getPokemon: async ({ pokemon }) => {
+        try {
+          const response = await fetch(
+            `https://pokeapi.co/api/v2/pokemon/${pokemon.toLowerCase()}`
+          );
+
+          if (!response.ok) {
+            if (response.status === 404) {
+              return `Error: Pokémon "${pokemon}" not found`;
+            }
+            return `Error: Failed to fetch Pokémon data (status ${response.status})`;
+          }
+
+          const data = await response.json();
+
+          const types = data.types
+            .map((t: { type: { name: string } }) => t.type.name)
+            .join(", ");
+          const abilities = data.abilities
+            .map((a: { ability: { name: string } }) => a.ability.name)
+            .join(", ");
+          const stats = data.stats
+            .map(
+              (s: { stat: { name: string }; base_stat: number }) =>
+                `${s.stat.name}: ${s.base_stat}`
+            )
+            .join(", ");
+
+          return `Name: ${data.name}
+ID: ${data.id}
+Types: ${types}
+Height: ${data.height / 10}m
+Weight: ${data.weight / 10}kg
+Abilities: ${abilities}
+Base Stats: ${stats}`;
+        } catch (err) {
+          return `Error: ${
+            err instanceof Error ? err.message : "Failed to fetch Pokémon data"
+          }`;
+        }
+      },
+    });
+  }, []);
+
   const handleSubmit = async () => {
     if (!prompt.trim()) return;
 
@@ -30,7 +134,8 @@ export default function App() {
       const result = await generateResponse({
         prompt: prompt.trim(),
         config: {
-          instructions: "You are a helpful, concise assistant.",
+          instructions:
+            "You are a helpful, concise assistant. You have access to tools for getting the current time, performing calculations, and looking up Pokémon information. Use them when appropriate.",
         },
       });
       setResponse(result.content);
