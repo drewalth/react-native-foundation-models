@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   isAvailable,
-  generateResponse,
-  registerToolHandlers,
+  FoundationModelSession,
+  type Message,
 } from "react-native-foundation-models";
 import {
   ActivityIndicator,
@@ -12,139 +12,154 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 
 export default function App() {
   const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const available = isAvailable();
 
-  // Register tool handlers on mount
-  useEffect(() => {
-    registerToolHandlers({
-      getCurrentTime: ({ timezone, format }) => {
-        const now = new Date();
+  // Create session with tools - no useEffect needed
+  const session = useMemo(() => {
+    if (!available) return null;
 
-        try {
-          if (format === "short") {
-            return now.toLocaleTimeString("en-US", {
-              timeZone: timezone || undefined,
-            });
-          }
+    return new FoundationModelSession({
+      instructions:
+        "You are a helpful, concise assistant. You have access to tools for getting the current time, performing calculations, and looking up Pokémon information. Use them when appropriate.",
+      tools: {
+        getCurrentTime: ({
+          timezone,
+          format,
+        }: {
+          timezone?: string;
+          format?: "short" | "long";
+        }) => {
+          const now = new Date();
 
-          return now.toLocaleString("en-US", {
-            timeZone: timezone || undefined,
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "numeric",
-            minute: "numeric",
-            second: "numeric",
-          });
-        } catch {
-          // Invalid timezone, fall back to local
-          return format === "short"
-            ? now.toLocaleTimeString()
-            : now.toLocaleString();
-        }
-      },
-
-      calculate: ({ expression }) => {
-        try {
-          // Simple safe math evaluation
-          // Only allow numbers, operators, parentheses, and whitespace
-          const sanitized = expression.replace(/[^0-9+\-*/().%\s]/g, "");
-          if (sanitized !== expression) {
-            return "Error: Invalid characters in expression";
-          }
-
-          // Use Function constructor for safe evaluation
-          // eslint-disable-next-line no-new-func
-          const result = new Function(`return (${sanitized})`)();
-
-          if (typeof result !== "number" || !isFinite(result)) {
-            return "Error: Invalid calculation result";
-          }
-
-          return String(result);
-        } catch (err) {
-          return `Error: ${
-            err instanceof Error ? err.message : "Calculation failed"
-          }`;
-        }
-      },
-
-      getPokemon: async ({ pokemon }) => {
-        try {
-          const response = await fetch(
-            `https://pokeapi.co/api/v2/pokemon/${pokemon.toLowerCase()}`
-          );
-
-          if (!response.ok) {
-            if (response.status === 404) {
-              return `Error: Pokémon "${pokemon}" not found`;
+          try {
+            if (format === "short") {
+              return now.toLocaleTimeString("en-US", {
+                timeZone: timezone || undefined,
+              });
             }
-            return `Error: Failed to fetch Pokémon data (status ${response.status})`;
+
+            return now.toLocaleString("en-US", {
+              timeZone: timezone || undefined,
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "numeric",
+              minute: "numeric",
+              second: "numeric",
+            });
+          } catch {
+            // Invalid timezone, fall back to local
+            return format === "short"
+              ? now.toLocaleTimeString()
+              : now.toLocaleString();
           }
+        },
 
-          const data = await response.json();
+        calculate: ({ expression }: { expression: string }) => {
+          try {
+            // Simple safe math evaluation
+            // Only allow numbers, operators, parentheses, and whitespace
+            const sanitized = expression.replace(/[^0-9+\-*/().%\s]/g, "");
+            if (sanitized !== expression) {
+              return "Error: Invalid characters in expression";
+            }
 
-          const types = data.types
-            .map((t: { type: { name: string } }) => t.type.name)
-            .join(", ");
-          const abilities = data.abilities
-            .map((a: { ability: { name: string } }) => a.ability.name)
-            .join(", ");
-          const stats = data.stats
-            .map(
-              (s: { stat: { name: string }; base_stat: number }) =>
-                `${s.stat.name}: ${s.base_stat}`
-            )
-            .join(", ");
+            // Use Function constructor for safe evaluation
+            // eslint-disable-next-line no-new-func
+            const result = new Function(`return (${sanitized})`)();
 
-          return `Name: ${data.name}
+            if (typeof result !== "number" || !isFinite(result)) {
+              return "Error: Invalid calculation result";
+            }
+
+            return String(result);
+          } catch (err) {
+            return `Error: ${
+              err instanceof Error ? err.message : "Calculation failed"
+            }`;
+          }
+        },
+
+        getPokemon: async ({ pokemon }: { pokemon: string }) => {
+          try {
+            const res = await fetch(
+              `https://pokeapi.co/api/v2/pokemon/${pokemon.toLowerCase()}`
+            );
+
+            if (!res.ok) {
+              if (res.status === 404) {
+                return `Error: Pokémon "${pokemon}" not found`;
+              }
+              return `Error: Failed to fetch Pokémon data (status ${res.status})`;
+            }
+
+            const data = await res.json();
+
+            const types = data.types
+              .map((t: { type: { name: string } }) => t.type.name)
+              .join(", ");
+            const abilities = data.abilities
+              .map((a: { ability: { name: string } }) => a.ability.name)
+              .join(", ");
+            const stats = data.stats
+              .map(
+                (s: { stat: { name: string }; base_stat: number }) =>
+                  `${s.stat.name}: ${s.base_stat}`
+              )
+              .join(", ");
+
+            return `Name: ${data.name}
 ID: ${data.id}
 Types: ${types}
 Height: ${data.height / 10}m
 Weight: ${data.weight / 10}kg
 Abilities: ${abilities}
 Base Stats: ${stats}`;
-        } catch (err) {
-          return `Error: ${
-            err instanceof Error ? err.message : "Failed to fetch Pokémon data"
-          }`;
-        }
+          } catch (err) {
+            return `Error: ${
+              err instanceof Error ? err.message : "Failed to fetch Pokémon data"
+            }`;
+          }
+        },
       },
     });
-  }, []);
+  }, [available]);
 
   const handleSubmit = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || !session) return;
 
     setLoading(true);
     setError(null);
-    setResponse("");
 
     try {
-      const result = await generateResponse({
-        prompt: prompt.trim(),
-        config: {
-          instructions:
-            "You are a helpful, concise assistant. You have access to tools for getting the current time, performing calculations, and looking up Pokémon information. Use them when appropriate.",
-        },
-      });
-      setResponse(result.content);
+      await session.sendMessage(prompt.trim());
+      // Update messages from session history
+      setMessages(session.getHistory());
+      setPrompt("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleClearHistory = useCallback(() => {
+    if (!session) return;
+    session.clearHistory();
+    setMessages([]);
+    setError(null);
+  }, [session]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -168,8 +183,35 @@ Base Stats: ${stats}`;
           </View>
         </View>
 
+        {messages.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.cardTitle}>Conversation</Text>
+              <TouchableOpacity onPress={handleClearHistory}>
+                <Text style={styles.clearButton}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+            {messages.map((message, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.messageContainer,
+                  message.role === "user"
+                    ? styles.userMessage
+                    : styles.assistantMessage,
+                ]}
+              >
+                <Text style={styles.messageRole}>
+                  {message.role === "user" ? "You" : "Assistant"}
+                </Text>
+                <Text style={styles.messageContent}>{message.content}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Prompt</Text>
+          <Text style={styles.cardTitle}>Message</Text>
           <TextInput
             style={styles.input}
             placeholder="Ask something..."
@@ -180,7 +222,7 @@ Base Stats: ${stats}`;
             editable={available && !loading}
           />
           <Button
-            title={loading ? "Generating..." : "Generate"}
+            title={loading ? "Sending..." : "Send"}
             onPress={handleSubmit}
             disabled={!available || loading || !prompt.trim()}
           />
@@ -196,13 +238,6 @@ Base Stats: ${stats}`;
           <View style={[styles.card, styles.errorCard]}>
             <Text style={styles.cardTitle}>Error</Text>
             <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {response && !loading && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Response</Text>
-            <Text style={styles.responseText}>{response}</Text>
           </View>
         )}
       </ScrollView>
@@ -245,6 +280,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 12,
   },
+  historyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  clearButton: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#007AFF",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  messageContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 8,
+  },
+  userMessage: {
+    backgroundColor: "#007AFF10",
+  },
+  assistantMessage: {
+    backgroundColor: "#f9f9f9",
+  },
+  messageRole: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+  messageContent: {
+    fontSize: 16,
+    color: "#000",
+    lineHeight: 22,
+  },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -281,10 +351,5 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 15,
     color: "#ff3b30",
-  },
-  responseText: {
-    fontSize: 17,
-    color: "#000",
-    lineHeight: 24,
   },
 });

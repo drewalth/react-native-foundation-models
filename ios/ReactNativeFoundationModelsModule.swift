@@ -27,7 +27,97 @@ public class ReactNativeFoundationModelsModule: Module {
             self.toolBridge?.handleToolResponse(result: result, error: error)
         }
 
-        // Generate a response using FoundationModels
+        // Create a new session with the given configuration
+        Function("createSession") { (config: SessionConfig?) in
+            guard #available(iOS 26.0, *) else {
+                throw FoundationModelsError.unavailable
+            }
+
+            let model = SystemLanguageModel.default
+
+            guard model.isAvailable else {
+                throw FoundationModelsError.unavailable
+            }
+
+            // Store the config for session recreation
+            self.currentSessionConfig = config
+
+            // Set up tool bridge
+            self.setupToolBridge()
+
+            // Create the session
+            self.currentSession = self.createLanguageModelSession(model: model, config: config)
+        }
+
+        // Send a message to the current session
+        AsyncFunction("sendMessage") { (prompt: String) -> GenerateResponse in
+            guard #available(iOS 26.0, *) else {
+                throw FoundationModelsError.unavailable
+            }
+
+            guard let session = self.currentSession else {
+                throw FoundationModelsError.noActiveSession
+            }
+
+            do {
+                let response = try await session.respond(to: prompt)
+                return GenerateResponse(content: response.content)
+            } catch let error as NSError {
+                if self.containsModelManagerError(error, code: 1026) {
+                    throw FoundationModelsError.appleIntelligenceNotEnabled
+                }
+                throw FoundationModelsError.generationFailed(error.localizedDescription)
+            } catch {
+                throw FoundationModelsError.generationFailed(error.localizedDescription)
+            }
+        }
+
+        // Get the conversation history from the current session
+        Function("getHistory") { () -> [MessageRecord] in
+            guard #available(iOS 26.0, *) else {
+                return []
+            }
+
+            guard let session = self.currentSession else {
+                return []
+            }
+
+            // Transcript conforms to Sequence, iterate directly
+            return session.transcript.compactMap { entry -> MessageRecord? in
+                switch entry {
+                case .prompt(let prompt):
+                    return MessageRecord(role: "user", content: "\(prompt)")
+                case .response(let response):
+                    return MessageRecord(role: "assistant", content: "\(response)")
+                @unknown default:
+                    return nil
+                }
+            }
+        }
+
+        // Clear the session history (recreates session with same config)
+        Function("clearSession") {
+            guard #available(iOS 26.0, *) else { return }
+
+            let model = SystemLanguageModel.default
+
+            guard model.isAvailable else { return }
+
+            // Recreate session with stored config
+            self.currentSession = self.createLanguageModelSession(
+                model: model,
+                config: self.currentSessionConfig
+            )
+        }
+
+        // Destroy the current session
+        Function("destroySession") {
+            self.currentSession = nil
+            self.currentSessionConfig = nil
+        }
+
+        // Legacy: Generate a response (creates ephemeral session)
+        // Kept for backwards compatibility
         AsyncFunction("generateResponse") { (options: GenerateOptions) -> GenerateResponse in
             guard #available(iOS 26.0, *) else {
                 throw FoundationModelsError.unavailable
@@ -39,16 +129,8 @@ public class ReactNativeFoundationModelsModule: Module {
                 throw FoundationModelsError.unavailable
             }
 
-            // Create tool bridge if needed
-            if self.toolBridge == nil {
-                self.toolBridge = ToolBridge()
-                self.toolBridge?.sendToolCallEvent = { [weak self] toolName, arguments in
-                    self?.sendEvent("onToolCall", [
-                        "toolName": toolName,
-                        "arguments": arguments
-                    ])
-                }
-            }
+            // Set up tool bridge
+            self.setupToolBridge()
 
             do {
                 let session: LanguageModelSession
@@ -82,6 +164,47 @@ public class ReactNativeFoundationModelsModule: Module {
     // MARK: Private
 
     private var toolBridge: ToolBridge?
+    @available(iOS 26.0, *)
+    private var currentSession: LanguageModelSession? {
+        get { _currentSession as? LanguageModelSession }
+        set { _currentSession = newValue }
+    }
+    private var _currentSession: Any?
+    private var currentSessionConfig: SessionConfig?
+
+    private func setupToolBridge() {
+        if toolBridge == nil {
+            if #available(iOS 26.0, *) {
+                toolBridge = ToolBridge()
+                toolBridge?.sendToolCallEvent = { [weak self] toolName, arguments in
+                    self?.sendEvent("onToolCall", [
+                        "toolName": toolName,
+                        "arguments": arguments
+                    ])
+                }
+            }
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private func createLanguageModelSession(
+        model: SystemLanguageModel,
+        config: SessionConfig?
+    ) -> LanguageModelSession {
+        if hasGeneratedTools(), let bridge = toolBridge {
+            return createSessionWithTools(
+                model: model,
+                instructions: config?.instructions,
+                bridge: bridge
+            )
+        } else {
+            if let instructions = config?.instructions {
+                return LanguageModelSession(model: model, instructions: instructions)
+            } else {
+                return LanguageModelSession(model: model)
+            }
+        }
+    }
 
     private func containsModelManagerError(_ error: NSError, code: Int) -> Bool {
         if error.domain.contains("ModelManagerError"), error.code == code {
@@ -125,11 +248,26 @@ struct GenerateResponse: Record {
     @Field var content = ""
 }
 
+// MARK: - MessageRecord
+
+struct MessageRecord: Record {
+    @Field var role: String = ""
+    @Field var content: String = ""
+
+    init() {}
+
+    init(role: String, content: String) {
+        self.role = role
+        self.content = content
+    }
+}
+
 // MARK: - FoundationModelsError
 
 enum FoundationModelsError: Error {
     case unavailable
     case appleIntelligenceNotEnabled
+    case noActiveSession
     case generationFailed(String)
 }
 
@@ -140,6 +278,8 @@ extension FoundationModelsError: LocalizedError {
             return "FoundationModels is not available on this device"
         case .appleIntelligenceNotEnabled:
             return "Apple Intelligence is not enabled or there is a version mismatch. Ensure Apple Intelligence is enabled in Settings > Apple Intelligence & Siri, and that your iOS simulator version matches your macOS version."
+        case .noActiveSession:
+            return "No active session. Call createSession() first."
         case .generationFailed(let message):
             return "Generation failed: \(message)"
         }

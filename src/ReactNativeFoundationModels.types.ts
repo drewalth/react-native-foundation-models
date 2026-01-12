@@ -11,6 +11,7 @@ export interface SessionConfig {
 
 /**
  * Options for generating a response.
+ * @deprecated Use FoundationModelSession.sendMessage() instead
  */
 export interface GenerateOptions {
   /**
@@ -35,6 +36,23 @@ export interface GenerateResponse {
 }
 
 /**
+ * A message in the conversation history.
+ */
+export interface Message {
+  /**
+   * The role of the message sender.
+   * - "user": A message from the user
+   * - "assistant": A response from the model
+   */
+  role: "user" | "assistant";
+
+  /**
+   * The text content of the message.
+   */
+  content: string;
+}
+
+/**
  * Error codes that can be thrown by the module.
  */
 export enum FoundationModelsErrorCode {
@@ -48,4 +66,10 @@ export enum FoundationModelsErrorCode {
    * The generation request failed.
    */
   GENERATION_FAILED = "GENERATION_FAILED",
+
+  /**
+   * No active session exists.
+   * Create a FoundationModelSession first.
+   */
+  NO_ACTIVE_SESSION = "NO_ACTIVE_SESSION",
 }

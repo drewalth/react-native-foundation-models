@@ -27,19 +27,26 @@ export function isAvailable(): boolean {
 /**
  * Generate a response using Apple's on-device FoundationModels.
  *
+ * @deprecated Use `FoundationModelSession` instead for stateful conversations
+ * and proper tool lifecycle management.
+ *
  * @param options - The generation options including prompt and optional config
  * @returns Promise resolving to the generated response
  * @throws Error if FoundationModels is unavailable or generation fails
  *
  * @example
  * ```typescript
+ * // Deprecated approach:
  * const response = await generateResponse({
  *   prompt: "What is the capital of France?",
- *   config: {
- *     instructions: "You are a helpful geography assistant."
- *   }
+ *   config: { instructions: "You are a helpful geography assistant." }
  * });
- * console.log(response.content);
+ *
+ * // Recommended approach:
+ * const session = new FoundationModelSession({
+ *   instructions: "You are a helpful geography assistant."
+ * });
+ * const response = await session.sendMessage("What is the capital of France?");
  * ```
  */
 export function generateResponse(
