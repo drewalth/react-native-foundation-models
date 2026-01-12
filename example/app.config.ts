@@ -40,7 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     [
-      "react-native-foundation-models",
+      "@drewalth/react-native-foundation-models",
       {
         tools: [
           {

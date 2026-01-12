@@ -13,18 +13,8 @@ React Native bindings for Apple's on-device [FoundationModels](https://developer
 
 ## Installation
 
-> **Note:** This package is not yet published to npm. You must build and link it locally.
-
 ```bash
-# Clone and build the module
-git clone https://github.com/drewalth/react-native-foundation-models.git
-cd react-native-foundation-models
-npm install
-npm run build
-npm link
-
-# In your project
-npm link react-native-foundation-models
+npx expo install @drewalth/react-native-foundation-models
 ```
 
 ## Usage
@@ -35,7 +25,7 @@ npm link react-native-foundation-models
 import {
   FoundationModelSession,
   isAvailable,
-} from "react-native-foundation-models";
+} from "@drewalth/react-native-foundation-models";
 
 if (isAvailable()) {
   // Create a session
@@ -100,7 +90,7 @@ export default {
   expo: {
     plugins: [
       [
-        "react-native-foundation-models",
+        "@drewalth/react-native-foundation-models",
         {
           tools: [
             {
@@ -163,7 +153,7 @@ export default {
 Pass tool handlers directly to the session constructor:
 
 ```typescript
-import { FoundationModelSession } from "react-native-foundation-models";
+import { FoundationModelSession } from "@drewalth/react-native-foundation-models";
 
 const session = new FoundationModelSession({
   instructions:
@@ -227,7 +217,7 @@ import {
   FoundationModelSession,
   isAvailable,
   type Message,
-} from "react-native-foundation-models";
+} from "@drewalth/react-native-foundation-models";
 
 function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
