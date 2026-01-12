@@ -1,8 +1,4 @@
-import {
-  ConfigPlugin,
-  withDangerousMod,
-  IOSConfig,
-} from "@expo/config-plugins";
+import { ConfigPlugin, withDangerousMod } from "@expo/config-plugins";
 import * as fs from "fs";
 import * as path from "path";
 
