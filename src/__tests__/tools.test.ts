@@ -48,7 +48,8 @@ describe("tools", () => {
     it("registers tool handlers and sets up event listener", () => {
       const handlers = {
         getCurrentTime: () => new Date().toISOString(),
-        calculate: async ({ expression }: { expression: string }) => String(eval(expression)),
+        calculate: async ({ expression }: { expression: string }) =>
+          String(eval(expression)),
       };
 
       registerToolHandlers(handlers);
@@ -116,7 +117,9 @@ describe("tools", () => {
     });
 
     it("responds with error when tool handler throws", async () => {
-      const mockHandler = jest.fn().mockRejectedValue(new Error("Handler failed"));
+      const mockHandler = jest
+        .fn()
+        .mockRejectedValue(new Error("Handler failed"));
       const handlers = {
         failingTool: mockHandler,
       };
@@ -129,7 +132,10 @@ describe("tools", () => {
         arguments: {},
       });
 
-      expect(mockRespondToToolCall).toHaveBeenCalledWith(null, "Handler failed");
+      expect(mockRespondToToolCall).toHaveBeenCalledWith(
+        null,
+        "Handler failed"
+      );
     });
 
     it("responds with error when tool handler throws non-Error object", async () => {

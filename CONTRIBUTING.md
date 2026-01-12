@@ -14,27 +14,32 @@ Thank you for your interest in contributing! This document provides guidelines f
 ### Getting Started
 
 1. Fork and clone the repository:
+
 ```bash
 git clone https://github.com/drewalth/react-native-foundation-models.git
 cd react-native-foundation-models
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Build the module:
+
 ```bash
 npm run build
 ```
 
 4. Run linting:
+
 ```bash
 npm run lint
 ```
 
 5. Run tests:
+
 ```bash
 npm test
 ```
@@ -94,6 +99,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 - `ci:` - CI configuration changes
 
 Example:
+
 ```bash
 git commit -m "feat: add streaming support for responses"
 git commit -m "fix: handle tool call errors correctly"
@@ -105,6 +111,7 @@ Commits are automatically validated using husky and commitlint.
 ## Pull Request Process
 
 1. Create a feature branch:
+
 ```bash
 git checkout -b feat/your-feature-name
 ```
@@ -112,6 +119,7 @@ git checkout -b feat/your-feature-name
 2. Make your changes and commit following the commit convention
 
 3. Ensure all tests pass and code is linted:
+
 ```bash
 npm run lint
 npm test
@@ -121,6 +129,7 @@ npm run build
 4. Push your branch and create a Pull Request
 
 5. Fill out the PR template with:
+
    - Description of changes
    - Related issues (if any)
    - Testing steps
@@ -169,6 +178,7 @@ Releases are automated using semantic-release:
 5. Creates GitHub release
 
 For pre-releases:
+
 - Merge to `beta` branch for beta releases
 - Merge to `next` branch for next releases
 

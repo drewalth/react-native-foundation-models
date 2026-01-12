@@ -83,13 +83,11 @@ describe("ReactNativeFoundationModelsModule", () => {
     });
 
     it("handles errors from native module", async () => {
-      mockGenerateResponse.mockRejectedValue(
-        new Error("Generation failed")
-      );
+      mockGenerateResponse.mockRejectedValue(new Error("Generation failed"));
 
-      await expect(
-        generateResponse({ prompt: "Test prompt" })
-      ).rejects.toThrow("Generation failed");
+      await expect(generateResponse({ prompt: "Test prompt" })).rejects.toThrow(
+        "Generation failed"
+      );
     });
   });
 });

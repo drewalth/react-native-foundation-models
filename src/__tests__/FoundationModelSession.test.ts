@@ -132,7 +132,9 @@ describe("FoundationModelSession", () => {
       const session = new FoundationModelSession();
       session.destroy();
 
-      expect(() => session.clearHistory()).toThrow("Session has been destroyed");
+      expect(() => session.clearHistory()).toThrow(
+        "Session has been destroyed"
+      );
     });
   });
 
@@ -183,14 +185,13 @@ describe("FoundationModelSession", () => {
       });
 
       expect(mockToolHandler).toHaveBeenCalledWith({ arg1: "value1" });
-      expect(mockRespondToToolCall).toHaveBeenCalledWith(
-        "Tool result",
-        null
-      );
+      expect(mockRespondToToolCall).toHaveBeenCalledWith("Tool result", null);
     });
 
     it("handles tool handler errors", async () => {
-      const mockToolHandler = jest.fn().mockRejectedValue(new Error("Tool error"));
+      const mockToolHandler = jest
+        .fn()
+        .mockRejectedValue(new Error("Tool error"));
       new FoundationModelSession({
         tools: { myTool: mockToolHandler },
       });
@@ -201,10 +202,7 @@ describe("FoundationModelSession", () => {
         arguments: {},
       });
 
-      expect(mockRespondToToolCall).toHaveBeenCalledWith(
-        null,
-        "Tool error"
-      );
+      expect(mockRespondToToolCall).toHaveBeenCalledWith(null, "Tool error");
     });
 
     it("handles missing tool handler", async () => {
@@ -280,10 +278,15 @@ describe("FoundationModelSession", () => {
       const streamId = "stream-456";
       mockStartStream.mockResolvedValue(streamId);
 
-      let completeListener: ((event: { streamId: string; content: string }) => void) | undefined;
+      let completeListener:
+        | ((event: { streamId: string; content: string }) => void)
+        | undefined;
       mockAddListener.mockImplementation((eventName, listener) => {
         if (eventName === "onStreamComplete") {
-          completeListener = listener as (event: { streamId: string; content: string }) => void;
+          completeListener = listener as (event: {
+            streamId: string;
+            content: string;
+          }) => void;
         }
         return { remove: jest.fn() };
       });
@@ -319,10 +322,15 @@ describe("FoundationModelSession", () => {
       const streamId = "stream-789";
       mockStartStream.mockResolvedValue(streamId);
 
-      let errorListener: ((event: { streamId: string; error: string }) => void) | undefined;
+      let errorListener:
+        | ((event: { streamId: string; error: string }) => void)
+        | undefined;
       mockAddListener.mockImplementation((eventName, listener) => {
         if (eventName === "onStreamError") {
-          errorListener = listener as (event: { streamId: string; error: string }) => void;
+          errorListener = listener as (event: {
+            streamId: string;
+            error: string;
+          }) => void;
         }
         return { remove: jest.fn() };
       });
