@@ -10,7 +10,7 @@ public class ReactNativeFoundationModelsModule: Module {
     public func definition() -> ModuleDefinition {
         Name("ReactNativeFoundationModels")
 
-        // Define events that can be sent to JavaScript
+        // Event sent when a tool needs to be executed
         Events("onToolCall")
 
         // Check if FoundationModels is available on this device
@@ -21,10 +21,10 @@ public class ReactNativeFoundationModelsModule: Module {
             return false
         }
 
-        // Respond to a tool call from JavaScript
-        Function("respondToToolCall") { (requestId: String, result: String?, error: String?) in
+        // Respond to a tool call from JavaScript (simplified - no requestId needed)
+        Function("respondToToolCall") { (result: String?, error: String?) in
             guard #available(iOS 26.0, *) else { return }
-            self.toolBridge?.handleToolResponse(requestId: requestId, result: result, error: error)
+            self.toolBridge?.handleToolResponse(result: result, error: error)
         }
 
         // Generate a response using FoundationModels
@@ -39,12 +39,11 @@ public class ReactNativeFoundationModelsModule: Module {
                 throw FoundationModelsError.unavailable
             }
 
-            // Create tool bridge if not exists
+            // Create tool bridge if needed
             if self.toolBridge == nil {
                 self.toolBridge = ToolBridge()
-                self.toolBridge?.sendToolCallEvent = { [weak self] requestId, toolName, arguments in
+                self.toolBridge?.sendToolCallEvent = { [weak self] toolName, arguments in
                     self?.sendEvent("onToolCall", [
-                        "requestId": requestId,
                         "toolName": toolName,
                         "arguments": arguments
                     ])
@@ -55,13 +54,11 @@ public class ReactNativeFoundationModelsModule: Module {
                 let session: LanguageModelSession
 
                 if hasGeneratedTools() {
-                    // Use session with generated tools
                     session = createSessionWithTools(
                         model: model,
                         instructions: options.config?.instructions,
                         bridge: self.toolBridge!)
                 } else {
-                    // No tools - use simple session
                     if let instructions = options.config?.instructions {
                         session = LanguageModelSession(model: model, instructions: instructions)
                     } else {
@@ -72,11 +69,9 @@ public class ReactNativeFoundationModelsModule: Module {
                 let response = try await session.respond(to: options.prompt)
                 return GenerateResponse(content: response.content)
             } catch let error as NSError {
-                // Check for ModelManagerError code 1026 - Apple Intelligence not enabled or version mismatch
                 if self.containsModelManagerError(error, code: 1026) {
                     throw FoundationModelsError.appleIntelligenceNotEnabled
                 }
-
                 throw FoundationModelsError.generationFailed(error.localizedDescription)
             } catch {
                 throw FoundationModelsError.generationFailed(error.localizedDescription)
@@ -86,24 +81,19 @@ public class ReactNativeFoundationModelsModule: Module {
 
     // MARK: Private
 
-    /// Tool bridge for communicating with JavaScript handlers.
     private var toolBridge: ToolBridge?
 
-    /// Recursively checks if an NSError or its underlying errors contain a ModelManagerError with the specified code
     private func containsModelManagerError(_ error: NSError, code: Int) -> Bool {
-        // Check if this error itself is a ModelManagerError with the target code
         if error.domain.contains("ModelManagerError"), error.code == code {
             return true
         }
 
-        // Check underlying error
         if let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError {
             if containsModelManagerError(underlying, code: code) {
                 return true
             }
         }
 
-        // Check multiple underlying errors
         if let multipleErrors = error.userInfo["NSMultipleUnderlyingErrorsKey"] as? [NSError] {
             for underlyingError in multipleErrors {
                 if containsModelManagerError(underlyingError, code: code) {
@@ -114,7 +104,6 @@ public class ReactNativeFoundationModelsModule: Module {
 
         return false
     }
-
 }
 
 // MARK: - SessionConfig
@@ -143,8 +132,6 @@ enum FoundationModelsError: Error {
     case appleIntelligenceNotEnabled
     case generationFailed(String)
 }
-
-// MARK: LocalizedError
 
 extension FoundationModelsError: LocalizedError {
     var errorDescription: String? {

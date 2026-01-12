@@ -6,7 +6,6 @@ import type { ToolHandlers, ToolName } from "./generated/tools";
  * Event payload when the model calls a tool.
  */
 interface ToolCallEvent {
-  requestId: string;
   toolName: string;
   arguments: Record<string, unknown>;
 }
@@ -19,11 +18,7 @@ interface ModuleEvents {
 }
 
 interface NativeToolModule {
-  respondToToolCall(
-    requestId: string,
-    result: string | null,
-    error: string | null
-  ): void;
+  respondToToolCall(result: string | null, error: string | null): void;
   addListener<K extends keyof ModuleEvents>(
     eventName: K,
     listener: ModuleEvents[K]
@@ -65,7 +60,6 @@ let subscription: EventSubscription | null = null;
  * ```
  */
 export function registerToolHandlers(handlers: ToolHandlers): void {
-  // Store handlers with type erasure for internal use
   currentHandlers = handlers as unknown as Record<
     string,
     (args: unknown) => Promise<string> | string
@@ -77,23 +71,18 @@ export function registerToolHandlers(handlers: ToolHandlers): void {
     subscription = null;
   }
 
-  // Set up event listener
+  // Set up event listener for tool calls
   subscription = NativeModule.addListener("onToolCall", async (event) => {
-    const { requestId, toolName, arguments: args } = event;
+    const { toolName, arguments: args } = event;
 
     if (!currentHandlers) {
-      NativeModule.respondToToolCall(
-        requestId,
-        null,
-        "No tool handlers registered"
-      );
+      NativeModule.respondToToolCall(null, "No tool handlers registered");
       return;
     }
 
     const handler = currentHandlers[toolName];
     if (!handler) {
       NativeModule.respondToToolCall(
-        requestId,
         null,
         `No handler registered for tool "${toolName}"`
       );
@@ -102,11 +91,11 @@ export function registerToolHandlers(handlers: ToolHandlers): void {
 
     try {
       const result = await handler(args);
-      NativeModule.respondToToolCall(requestId, result, null);
+      NativeModule.respondToToolCall(result, null);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      NativeModule.respondToToolCall(requestId, null, errorMessage);
+      NativeModule.respondToToolCall(null, errorMessage);
     }
   });
 }

@@ -143,6 +143,9 @@ func createSessionWithTools(
     instructions: String?,
     bridge: ToolBridge
 ) -> LanguageModelSession {
+    // Bridge unused when no tools are configured
+    _ = bridge
+
     if let instructions {
         return LanguageModelSession(model: model, instructions: instructions)
     } else {
@@ -210,6 +213,9 @@ func createSessionWithTools(
     instructions: String?,
     bridge: ToolBridge
 ) -> LanguageModelSession {
+    // Bridge unused when no tools are configured
+    _ = bridge
+
     if let instructions {
         return LanguageModelSession(model: model, instructions: instructions)
     } else {
