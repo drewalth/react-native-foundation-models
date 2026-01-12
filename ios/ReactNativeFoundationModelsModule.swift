@@ -106,8 +106,7 @@ public class ReactNativeFoundationModelsModule: Module {
             // Recreate session with stored config
             self.currentSession = self.createLanguageModelSession(
                 model: model,
-                config: self.currentSessionConfig
-            )
+                config: self.currentSessionConfig)
         }
 
         // Destroy the current session
@@ -164,13 +163,14 @@ public class ReactNativeFoundationModelsModule: Module {
     // MARK: Private
 
     private var toolBridge: ToolBridge?
+    private var _currentSession: Any?
+    private var currentSessionConfig: SessionConfig?
+
     @available(iOS 26.0, *)
     private var currentSession: LanguageModelSession? {
         get { _currentSession as? LanguageModelSession }
         set { _currentSession = newValue }
     }
-    private var _currentSession: Any?
-    private var currentSessionConfig: SessionConfig?
 
     private func setupToolBridge() {
         if toolBridge == nil {
@@ -189,14 +189,13 @@ public class ReactNativeFoundationModelsModule: Module {
     @available(iOS 26.0, *)
     private func createLanguageModelSession(
         model: SystemLanguageModel,
-        config: SessionConfig?
-    ) -> LanguageModelSession {
+        config: SessionConfig?)
+    -> LanguageModelSession {
         if hasGeneratedTools(), let bridge = toolBridge {
             return createSessionWithTools(
                 model: model,
                 instructions: config?.instructions,
-                bridge: bridge
-            )
+                bridge: bridge)
         } else {
             if let instructions = config?.instructions {
                 return LanguageModelSession(model: model, instructions: instructions)
@@ -251,10 +250,10 @@ struct GenerateResponse: Record {
 // MARK: - MessageRecord
 
 struct MessageRecord: Record {
-    @Field var role: String = ""
-    @Field var content: String = ""
+    @Field var role = ""
+    @Field var content = ""
 
-    init() {}
+    init() { }
 
     init(role: String, content: String) {
         self.role = role
@@ -270,6 +269,8 @@ enum FoundationModelsError: Error {
     case noActiveSession
     case generationFailed(String)
 }
+
+// MARK: LocalizedError
 
 extension FoundationModelsError: LocalizedError {
     var errorDescription: String? {

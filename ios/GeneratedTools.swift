@@ -13,8 +13,8 @@ import FoundationModels
 func createSessionWithTools(
     model: SystemLanguageModel,
     instructions: String?,
-    bridge: ToolBridge
-) -> LanguageModelSession {
+    bridge: ToolBridge)
+-> LanguageModelSession {
     // Bridge unused when no tools are configured
     _ = bridge
 

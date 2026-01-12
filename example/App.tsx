@@ -128,7 +128,9 @@ Abilities: ${abilities}
 Base Stats: ${stats}`;
           } catch (err) {
             return `Error: ${
-              err instanceof Error ? err.message : "Failed to fetch Pokémon data"
+              err instanceof Error
+                ? err.message
+                : "Failed to fetch Pokémon data"
             }`;
           }
         },

@@ -19,13 +19,6 @@ final class ToolBridge: @unchecked Sendable {
     /// Event emitter closure to send tool call requests to JavaScript.
     var sendToolCallEvent: ((_ toolName: String, _ arguments: [String: Any]) -> Void)?
 
-    /// Current pending continuation for the active tool call.
-    /// Only one tool call can be in-flight at a time (sequential model).
-    private var pendingContinuation: CheckedContinuation<String, Error>?
-
-    /// Lock for thread-safe continuation access.
-    private let lock = NSLock()
-
     /// Called by JavaScript to provide the tool call result.
     func handleToolResponse(result: String?, error: String?) {
         lock.lock()
@@ -77,6 +70,16 @@ final class ToolBridge: @unchecked Sendable {
             return result
         }
     }
+
+    // MARK: Private
+
+    /// Current pending continuation for the active tool call.
+    /// Only one tool call can be in-flight at a time (sequential model).
+    private var pendingContinuation: CheckedContinuation<String, Error>?
+
+    /// Lock for thread-safe continuation access.
+    private let lock = NSLock()
+
 }
 
 // MARK: - ToolBridgeError
