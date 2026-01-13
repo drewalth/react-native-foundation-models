@@ -88,6 +88,19 @@ const NativeModule = requireNativeModule<NativeSessionModule>(
 );
 
 /**
+ * Simple logger utility that respects debug flag.
+ */
+class Logger {
+  constructor(private enabled: boolean) {}
+
+  log(...args: unknown[]): void {
+    if (this.enabled) {
+      console.log("[FoundationModels]", ...args);
+    }
+  }
+}
+
+/**
  * A session for conversing with Apple's on-device FoundationModels.
  *
  * The session maintains conversation history across multiple messages and
@@ -126,6 +139,7 @@ export class FoundationModelSession {
     (args: unknown) => Promise<string> | string
   > | null = null;
   private toolSubscription: EventSubscription | null = null;
+  private logger: Logger;
 
   /**
    * Create a new FoundationModelSession.
@@ -136,15 +150,22 @@ export class FoundationModelSession {
   constructor(config?: FoundationModelSessionConfig) {
     const { tools, ...sessionConfig } = config ?? {};
 
+    // Initialize logger
+    this.logger = new Logger(sessionConfig.debug ?? false);
+    this.logger.log("Creating new session", { config: sessionConfig });
+
     // Register tool handlers if provided
     if (tools) {
+      this.logger.log("Registering tools", { toolNames: Object.keys(tools) });
       this.registerTools(tools);
     }
 
     // Create native session
+    this.logger.log("Calling NativeModule.createSession");
     NativeModule.createSession(
       Object.keys(sessionConfig).length > 0 ? sessionConfig : null
     );
+    this.logger.log("Session created successfully");
   }
 
   /**
@@ -159,7 +180,18 @@ export class FoundationModelSession {
    */
   async sendMessage(prompt: string): Promise<GenerateResponse> {
     this.ensureNotDestroyed();
-    return NativeModule.sendMessage(prompt);
+    this.logger.log("sendMessage called", { promptLength: prompt.length });
+
+    try {
+      const response = await NativeModule.sendMessage(prompt);
+      this.logger.log("sendMessage completed", {
+        responseLength: response.content.length,
+      });
+      return response;
+    } catch (error) {
+      this.logger.log("sendMessage failed", { error });
+      throw error;
+    }
   }
 
   /**
@@ -188,6 +220,9 @@ export class FoundationModelSession {
     prompt: string
   ): AsyncGenerator<StreamChunk, StreamResult, undefined> {
     this.ensureNotDestroyed();
+    this.logger.log("sendMessageStream called", {
+      promptLength: prompt.length,
+    });
 
     interface QueueItem {
       type: "chunk" | "complete" | "error";
@@ -216,13 +251,19 @@ export class FoundationModelSession {
     };
 
     // Start the stream
+    this.logger.log("Starting stream");
     const streamId = await NativeModule.startStream(prompt);
+    this.logger.log("Stream started", { streamId });
 
     // Set up event listeners
     const updateListener = NativeModule.addListener(
       "onStreamUpdate",
       (event: StreamUpdateEvent) => {
         if (event.streamId === streamId) {
+          this.logger.log("Stream update received", {
+            deltaLength: event.delta.length,
+            accumulatedLength: event.accumulated.length,
+          });
           push({
             type: "chunk",
             data: {
@@ -238,6 +279,9 @@ export class FoundationModelSession {
       "onStreamComplete",
       (event: StreamCompleteEvent) => {
         if (event.streamId === streamId) {
+          this.logger.log("Stream completed", {
+            contentLength: event.content.length,
+          });
           push({
             type: "complete",
             data: {
@@ -252,6 +296,7 @@ export class FoundationModelSession {
       "onStreamError",
       (event: StreamErrorEvent) => {
         if (event.streamId === streamId) {
+          this.logger.log("Stream error", { error: event.error });
           push({
             type: "error",
             data: new Error(event.error),
@@ -314,17 +359,21 @@ export class FoundationModelSession {
   destroy(): void {
     if (this.destroyed) return;
 
+    this.logger.log("Destroying session");
     this.destroyed = true;
 
     // Clean up tool subscription
     if (this.toolSubscription) {
+      this.logger.log("Removing tool subscription");
       this.toolSubscription.remove();
       this.toolSubscription = null;
     }
     this.toolHandlers = null;
 
     // Destroy native session
+    this.logger.log("Calling NativeModule.destroySession");
     NativeModule.destroySession();
+    this.logger.log("Session destroyed");
   }
 
   /**
@@ -344,14 +393,17 @@ export class FoundationModelSession {
       "onToolCall",
       async (event) => {
         const { toolName, arguments: args } = event;
+        this.logger.log("Tool call received", { toolName, arguments: args });
 
         if (!this.toolHandlers) {
+          this.logger.log("Tool call failed: No handlers registered");
           NativeModule.respondToToolCall(null, "No tool handlers registered");
           return;
         }
 
         const handler = this.toolHandlers[toolName];
         if (!handler) {
+          this.logger.log("Tool call failed: Handler not found", { toolName });
           NativeModule.respondToToolCall(
             null,
             `No handler registered for tool "${toolName}"`
@@ -360,11 +412,20 @@ export class FoundationModelSession {
         }
 
         try {
+          this.logger.log("Executing tool handler", { toolName });
           const result = await handler(args);
+          this.logger.log("Tool handler completed", {
+            toolName,
+            resultLength: result.length,
+          });
           NativeModule.respondToToolCall(result, null);
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
+          this.logger.log("Tool handler failed", {
+            toolName,
+            error: errorMessage,
+          });
           NativeModule.respondToToolCall(null, errorMessage);
         }
       }

@@ -24,6 +24,7 @@ public class ReactNativeFoundationModelsModule: Module {
         // Respond to a tool call from JavaScript (simplified - no requestId needed)
         Function("respondToToolCall") { (result: String?, error: String?) in
             guard #available(iOS 26.0, *) else { return }
+            self.log("respondToToolCall called from JS", "result: \(result?.prefix(100) ?? "nil"), error: \(error ?? "nil")")
             self.toolBridge?.handleToolResponse(result: result, error: error)
         }
 
@@ -33,9 +34,14 @@ public class ReactNativeFoundationModelsModule: Module {
                 throw FoundationModelsError.unavailable
             }
 
+            // Set debug flag
+            self.debugEnabled = config?.debug ?? false
+            self.log("createSession called", config?.instructions ?? "no instructions")
+
             let model = SystemLanguageModel.default
 
             guard model.isAvailable else {
+                self.log("Model is not available")
                 throw FoundationModelsError.unavailable
             }
 
@@ -43,10 +49,13 @@ public class ReactNativeFoundationModelsModule: Module {
             self.currentSessionConfig = config
 
             // Set up tool bridge
+            self.log("Setting up tool bridge")
             self.setupToolBridge()
 
             // Create the session
+            self.log("Creating language model session")
             self.currentSession = self.createLanguageModelSession(model: model, config: config)
+            self.log("Session created successfully")
         }
 
         // Send a message to the current session
@@ -55,19 +64,26 @@ public class ReactNativeFoundationModelsModule: Module {
                 throw FoundationModelsError.unavailable
             }
 
+            self.log("sendMessage called", "prompt length: \(prompt.count)")
+
             guard let session = self.currentSession else {
+                self.log("sendMessage failed: No active session")
                 throw FoundationModelsError.noActiveSession
             }
 
             do {
+                self.log("Calling session.respond()")
                 let response = try await session.respond(to: prompt)
+                self.log("sendMessage completed", "response length: \(response.content.count)")
                 return GenerateResponse(content: response.content)
             } catch let error as NSError {
+                self.log("sendMessage error", error.localizedDescription)
                 if self.containsModelManagerError(error, code: 1026) {
                     throw FoundationModelsError.appleIntelligenceNotEnabled
                 }
                 throw FoundationModelsError.generationFailed(error.localizedDescription)
             } catch {
+                self.log("sendMessage error", error.localizedDescription)
                 throw FoundationModelsError.generationFailed(error.localizedDescription)
             }
         }
@@ -111,8 +127,10 @@ public class ReactNativeFoundationModelsModule: Module {
 
         // Destroy the current session
         Function("destroySession") {
+            self.log("destroySession called")
             self.currentSession = nil
             self.currentSessionConfig = nil
+            self.log("Session destroyed")
         }
 
         // Start streaming response
@@ -121,21 +139,29 @@ public class ReactNativeFoundationModelsModule: Module {
                 throw FoundationModelsError.unavailable
             }
 
+            self.log("startStream called", "prompt length: \(prompt.count)")
+
             guard let session = self.currentSession else {
+                self.log("startStream failed: No active session")
                 throw FoundationModelsError.noActiveSession
             }
 
             // Generate unique stream ID
             let streamId = UUID().uuidString
+            self.log("Stream started", "streamId: \(streamId)")
 
             // Start async task that iterates over stream responses
             let task = Task {
                 do {
                     var lastContent = ""
+                    var chunkCount = 0
                     for try await partial in session.streamResponse(to: prompt) {
                         let currentContent = partial.content
                         let delta = String(currentContent.dropFirst(lastContent.count))
                         lastContent = currentContent
+                        chunkCount += 1
+
+                        self.log("Stream update", "chunk #\(chunkCount), delta length: \(delta.count), accumulated: \(currentContent.count)")
 
                         self.sendEvent("onStreamUpdate", [
                             "streamId": streamId,
@@ -143,15 +169,22 @@ public class ReactNativeFoundationModelsModule: Module {
                             "accumulated": currentContent
                         ])
                     }
+                    self.log("Stream completed", "streamId: \(streamId), total content length: \(lastContent.count)")
                     self.sendEvent("onStreamComplete", [
                         "streamId": streamId,
                         "content": lastContent
                     ])
                 } catch let error as NSError {
+                    self.log("Stream error", error.localizedDescription)
                     if self.containsModelManagerError(error, code: 1026) {
+                        let errorMessage = """
+              Apple Intelligence is not enabled or there is a version mismatch. \
+              Ensure Apple Intelligence is enabled in Settings > Apple Intelligence & Siri, \
+              and that your iOS simulator version matches your macOS version.
+              """
                         self.sendEvent("onStreamError", [
                             "streamId": streamId,
-                            "error": "Apple Intelligence is not enabled or there is a version mismatch. Ensure Apple Intelligence is enabled in Settings > Apple Intelligence & Siri, and that your iOS simulator version matches your macOS version."
+                            "error": errorMessage
                         ])
                     } else {
                         self.sendEvent("onStreamError", [
@@ -160,6 +193,7 @@ public class ReactNativeFoundationModelsModule: Module {
                         ])
                     }
                 } catch {
+                    self.log("Stream error", error.localizedDescription)
                     self.sendEvent("onStreamError", [
                         "streamId": streamId,
                         "error": error.localizedDescription
@@ -174,11 +208,14 @@ public class ReactNativeFoundationModelsModule: Module {
 
         // Cancel active stream
         Function("cancelStream") { (streamId: String) in
+            self.log("cancelStream called", "streamId: \(streamId)")
             guard let task = self.activeStreams[streamId] else {
+                self.log("cancelStream: Stream not found")
                 return
             }
             task.cancel()
             self.activeStreams.removeValue(forKey: streamId)
+            self.log("Stream cancelled successfully")
         }
 
         // Legacy: Generate a response (creates ephemeral session)
@@ -232,6 +269,7 @@ public class ReactNativeFoundationModelsModule: Module {
     private var _currentSession: Any?
     private var currentSessionConfig: SessionConfig?
     private var activeStreams: [String: Task<Void, Never>] = [:]
+    private var debugEnabled = false
 
     @available(iOS 26.0, *)
     private var currentSession: LanguageModelSession? {
@@ -239,10 +277,20 @@ public class ReactNativeFoundationModelsModule: Module {
         set { _currentSession = newValue }
     }
 
+    private func log(_ message: String, _ data: Any? = nil) {
+        guard debugEnabled else { return }
+        if let data {
+            print("[FoundationModels:iOS] \(message): \(data)")
+        } else {
+            print("[FoundationModels:iOS] \(message)")
+        }
+    }
+
     private func setupToolBridge() {
         if toolBridge == nil {
             if #available(iOS 26.0, *) {
                 toolBridge = ToolBridge()
+                toolBridge?.debugEnabled = debugEnabled
                 toolBridge?.sendToolCallEvent = { [weak self] toolName, arguments in
                     self?.sendEvent("onToolCall", [
                         "toolName": toolName,
@@ -299,6 +347,7 @@ public class ReactNativeFoundationModelsModule: Module {
 
 struct SessionConfig: Record {
     @Field var instructions: String?
+    @Field var debug = false
 }
 
 // MARK: - GenerateOptions
@@ -345,7 +394,11 @@ extension FoundationModelsError: LocalizedError {
         case .unavailable:
             return "FoundationModels is not available on this device"
         case .appleIntelligenceNotEnabled:
-            return "Apple Intelligence is not enabled or there is a version mismatch. Ensure Apple Intelligence is enabled in Settings > Apple Intelligence & Siri, and that your iOS simulator version matches your macOS version."
+            return """
+        Apple Intelligence is not enabled or there is a version mismatch. \
+        Ensure Apple Intelligence is enabled in Settings > Apple Intelligence & Siri, \
+        and that your iOS simulator version matches your macOS version.
+        """
         case .noActiveSession:
             return "No active session. Call createSession() first."
         case .generationFailed(let message):

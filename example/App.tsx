@@ -32,6 +32,7 @@ export default function App() {
     if (!available) return null;
 
     return new FoundationModelSession({
+      debug: true,
       instructions:
         "You are a helpful, concise assistant. You have access to tools for getting the current time, performing calculations, and looking up Pokémon information. Use them when appropriate.",
       tools: {

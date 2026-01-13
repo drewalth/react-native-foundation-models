@@ -7,6 +7,14 @@ export interface SessionConfig {
    * This sets the context and constraints for all responses in the session.
    */
   instructions?: string;
+
+  /**
+   * Enable debug logging to console.
+   * When enabled, logs detailed information about query submission,
+   * native bridge calls, streaming updates, and tool invocations.
+   * @default false
+   */
+  debug?: boolean;
 }
 
 /**
